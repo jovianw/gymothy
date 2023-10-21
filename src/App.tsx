@@ -1,35 +1,116 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from "react";
+import "./App.css";
+import Auth from "./components/Auth";
+import { db } from "./config/firebase";
+import {
+  getDocs,
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
+
+interface Exercise {
+  name?: string;
+  muscleTags?: string[];
+  id?: string;
+}
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+
+  // New exercise states
+  const [newExercise, setNewExercise] = useState<Exercise>({
+    name: "",
+    muscleTags: [],
+  });
+
+  const exercisesCollectionRef = collection(db, "exercises");
+
+  const getExercises = async () => {
+    try {
+      const data = await getDocs(exercisesCollectionRef);
+      const docs: Exercise[] = data.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id,
+      }));
+      setExercises(docs);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    getExercises();
+  }, []);
+
+  const onSubmitExercise = async () => {
+    try {
+      await addDoc(exercisesCollectionRef, newExercise);
+
+      setNewExercise({
+        name: "",
+        muscleTags: [],
+      });
+      getExercises();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const deleteExercise = async (id: string | undefined) => {
+    if (id) {
+      const exerciseDoc = doc(db, "exercises", id);
+      try {
+        await deleteDoc(exerciseDoc);
+
+        getExercises();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  };
 
   return (
     <>
+      <Auth />
       <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        <input
+          placeholder="exercise name..."
+          onChange={(e) =>
+            setNewExercise({ ...newExercise, name: e.target.value })
+          }
+        />
+        <input
+          placeholder="muscles (split with commas)..."
+          onChange={(e) =>
+            setNewExercise({
+              ...newExercise,
+              muscleTags: e.target.value.split(", "),
+            })
+          }
+        />
+        <button onClick={onSubmitExercise}>Submit Exercise</button>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
+      <div>
+        {exercises?.map((exercise) => (
+          <div key={exercise.id}>
+            <h1>{exercise.name}</h1>
+            {exercise.muscleTags?.map((muscleTag) => (
+              <p key={muscleTag}>{muscleTag}</p>
+            ))}
+            <button
+              onClick={() => {
+                deleteExercise(exercise.id);
+              }}
+            >
+              Delete Exercise
+            </button>
+          </div>
+        ))}
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
-  )
+  );
 }
 
-export default App
+export default App;
